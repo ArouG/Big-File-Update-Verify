@@ -2,7 +2,7 @@
 //----------------------------------------
 // receive :   1.0 du 11/03/2022
 //             2.1 du 25/03/2022  
-//             2.2 du 27/03/2022  rajouter delete, taille (I)
+//             2.2 du 02/12/2022   ligne 283 remplace r+ par c+b
 // -------- 2 formes d'appel ----------------
 //  1 GET :
 //      receive.php?N=<nom>&D=<date>&S=<taille>&C=<taille_Chunk> 32 (Mo par défaut)
@@ -81,11 +81,11 @@ function hash_in($blob)
     }
     $table = [];
     $nbrow = strlen($blob) / 20;
-    //file_ecrit('receive_deb.txt','84: '.$nbrow."\n");
+    //file_ecrit('receive_deb.txt','83: '.$nbrow."\n");
     for ($i = 0;$i < $nbrow;$i++)
     {
         $table[] = substr($blob, 20 * $i, 20);
-        //file_ecrit('receive_deb.txt','88: '.substr($blob, 20*$i, 20)."\n");
+        //file_ecrit('receive_deb.txt','87: '.substr($blob, 20*$i, 20)."\n");
         
     }
     return $table;
@@ -111,7 +111,7 @@ while (!feof($input))
     $input_post .= fread($input, 8192);
 }
 fclose($input);
-//file_ecrit('receive_deb.txt','114: taille input = '.strlen($input_post)."\n");
+//file_ecrit('receive_deb.txt','113: taille input = '.strlen($input_post)."\n");
 $db = new PDO('sqlite:bfuv.sqlite');
 
 // si forme GET :
@@ -158,7 +158,7 @@ if (strlen($input_post) == 0)
     {
         // vérification si dejà existant : on compte combien y'en a
         $reqsel = "SELECT ROWID FROM files WHERE (nom = '" . $N . "') AND (taille = '" . $S . "') AND (date = '" . $D . "') AND (cluster = " . $C . ")";
-        //file_ecrit('receive_deb.txt','161 : '.$reqsel."\n");
+        //file_ecrit('receive_deb.txt','160 : '.$reqsel."\n");
         $stmt = $db->query($reqsel);
         $stmt->setFetchMode(PDO::FETCH_OBJ);
         $rows = $stmt->fetchAll();
@@ -182,13 +182,13 @@ if (strlen($input_post) == 0)
         else
         {
             // ligne déjà existante a priori impossible car le client ne l'a pas récupérée à l'initialisation
-            //file_ecrit('receive_deb.txt',"185: EXISTE, ligne ".$res."\n");
+            //file_ecrit('receive_deb.txt',"184: EXISTE, ligne ".$res."\n");
             $retour_GET['new'] = false;
             $retour_GET['RId'] = $rows[0]->rowid;
         }
         $tableH = '';
         $fileSv = './' . $N;
-        //file_ecrit('receive_deb.txt',"191: OK".json_encode($retour_GET)."\n");
+        //file_ecrit('receive_deb.txt',"190: OK".json_encode($retour_GET)."\n");
         echo json_encode($retour_GET);
     }
     else
@@ -213,7 +213,7 @@ if (strlen($input_post) == 0)
         else
         {
             echo json_encode($retour_GET);
-            //file_ecrit('receive_deb.txt',"216: bizz\n");
+            //file_ecrit('receive_deb.txt',"215: bizz\n");
         }
     }
     $db = Null;
@@ -223,11 +223,11 @@ else
     // $input non vide : POST
     $ind = strpos($input_post, "*");
     $firstpart = substr($input_post, 0, $ind);
-    //file_ecrit('receive_deb.txt','226: '.$firstpart."\n");
+    //file_ecrit('receive_deb.txt','225: '.$firstpart."\n");
     $params = explode("-", $firstpart);
     $rowId = intval($params[0]);
     $name = $params[1];
-    //file_ecrit('receive_deb.txt','230: rowid='.$rowId." et name=".$name."\n");
+    //file_ecrit('receive_deb.txt','229: rowid='.$rowId." et name=".$name."\n");
     if (substr($name, 0, 6) == 'cremod')
     { // envoit d'une partie d'un cluster (gros chunk)
         $params = explode("_", $name);
@@ -235,7 +235,7 @@ else
         $clustInd = intval($params[2]);
         $hashBlCl = $params[3];
         $buffsize = intval($params[4]);
-        //file_ecrit('receive_deb.txt','238: cremod=('.$ieme.",".$clustInd.",".$buffsize."\n");
+        //file_ecrit('receive_deb.txt','237: cremod=('.$ieme.",".$clustInd.",".$buffsize."\n");
         $reqsel = "SELECT nom, taille, cluster, hex(hashT) AS HhashT FROM files WHERE rowid = " . $rowId;
         $pdo_result = $db->query($reqsel);
         $pdo_result->setFetchMode(PDO::FETCH_BOTH);
@@ -257,7 +257,7 @@ else
             {
                 $ret = file_ecrit($tmpfile, $data);
             }
-            //file_ecrit('receive_deb.txt','260: ret='.$ret."\n");
+            //file_ecrit('receive_deb.txt','259: ret='.$ret."\n");
             if ($ret == $buffsize)
             {
                 if ($clustInd < 99)
@@ -267,10 +267,10 @@ else
                 }
                 else
                 {
-                    //file_ecrit('receive_deb.txt','270: hexHashTable= '.$locHashT."\n");
+                    //file_ecrit('receive_deb.txt','269: hexHashTable= '.$locHashT."\n");
                     // 100 ième envoi (ou premier et unique)
                     $blocHash = sha1_file($tmpfile);
-                    //file_ecrit('receive_deb.txt','273: blocHash= '.$blocHash."\n");
+                    //file_ecrit('receive_deb.txt','272: blocHash= '.$blocHash."\n");
                     if ($hashBlCl != $blocHash)
                     { // Aïe !
                         @unlink($tmpfile); // on efface le fichier
@@ -280,7 +280,7 @@ else
                     {
                         // OK on a bien le bon bloc ! on l'écrit / remplace dans notre fichier
                         // positionnons-nous bien au bon endroit ! suppose que taille est au moins égale à ... normalement oui !
-                        $f2mod = fopen($namef, "r+");
+                        $f2mod = fopen($namef, "c+b");                      //maj   c création b pour mode binaire
                         for ($k = 0;$k < $ieme;$k++)
                         {
                             $nimp = fread($f2mod, $clusterf);
@@ -319,7 +319,7 @@ else
         $sizef = bcadd("0", $rows[0]['taille']);
         $clusterf = 1048576 * $rows[0]['cluster'];
         $locHashT = $rows[0]['HhashT'];                 // écrit en hexa 20 caract par clef, 40 par paire
-        //file_ecrit('receive_deb.txt','322: lochashT='.$locHashT."\n");  // ecrit en hexa
+        //file_ecrit('receive_deb.txt','320: lochashT='.$locHashT."\n");  // ecrit en hexa
         $f2mod = fopen($namef, "rb"); // pas d'écriture
         for ($k = 0;$k < $ieme;$k++)
         {
